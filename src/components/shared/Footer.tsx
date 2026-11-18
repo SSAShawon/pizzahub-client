@@ -8,7 +8,6 @@ import {
   Mail,
   ArrowRight,
   Heart,
-  Users,
 } from "lucide-react";
 
 const footerLinks = {
@@ -162,7 +161,7 @@ export default function Footer() {
         {/* Bottom Footer */}
         <div className="flex flex-col justify-between gap-5 pt-8 sm:flex-row sm:items-center">
           <p className="text-xs text-white/45">
-            © {new Date().getFullYear()} PizzaHub. All rights reserved.
+            © 2026 PizzaHub. All rights reserved.
           </p>
 
           <div className="flex flex-wrap items-center gap-6">

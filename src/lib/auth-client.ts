@@ -14,9 +14,11 @@ export const authClient = createAuthClient({
       user: {
         role: {
           type: ["customer", "vendor", "admin"],
+          required: false,
         },
         isBlocked: {
           type: "boolean",
+          required: false,
         },
       },
     }),
