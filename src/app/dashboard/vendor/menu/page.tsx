@@ -1,8 +1,8 @@
-
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import Image from "next/image";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -21,65 +21,68 @@ import {
   X,
 } from "lucide-react";
 
+type MenuStatus = "approved" | "pending" | "rejected";
+
 type MenuItem = {
-  id: number;
+  _id: string;
   name: string;
   category: string;
   description: string;
   price: number;
   image: string;
-  status: "Approved" | "Pending" | "Rejected";
+  status: MenuStatus;
+  isAvailable: boolean;
 };
-
-const initialMenuItems: MenuItem[] = [
-  {
-    id: 1,
-    name: "Margherita Pizza",
-    category: "Classic Pizza",
-    description: "Fresh mozzarella, tomato sauce, basil and olive oil.",
-    price: 18,
-    image:
-      "https://images.unsplash.com/photo-1579751626657-72bc17010498?w=700",
-    status: "Approved",
-  },
-  {
-    id: 2,
-    name: "Pepperoni Pizza",
-    category: "Classic Pizza",
-    description: "Classic pepperoni with mozzarella and tomato sauce.",
-    price: 22,
-    image:
-      "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=700",
-    status: "Approved",
-  },
-  {
-    id: 3,
-    name: "Four Cheese Pizza",
-    category: "Special Pizza",
-    description: "A rich blend of four delicious Italian cheeses.",
-    price: 25,
-    image:
-      "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=700",
-    status: "Pending",
-  },
-];
 
 const navigation = [
   { label: "Overview", href: "/dashboard/vendor", icon: LayoutDashboard },
   { label: "My Menu", href: "/dashboard/vendor/menu", icon: UtensilsCrossed },
   { label: "Orders", href: "/dashboard/vendor/orders", icon: ShoppingBag },
-  { label: "Restaurant Profile", href: "/dashboard/vendor/profile", icon: Store },
-  { label: "Subscription", href: "/dashboard/vendor/subscription", icon: CreditCard },
+  {
+    label: "Restaurant Profile",
+    href: "/dashboard/vendor/profile",
+    icon: Store,
+  },
+  {
+    label: "Subscription",
+    href: "/dashboard/vendor/subscription",
+    icon: CreditCard,
+  },
   { label: "Settings", href: "/dashboard/vendor/settings", icon: Settings },
 ];
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+const filters = ["All", "Approved", "Pending", "Rejected"];
+
+const getStatusLabel = (status: MenuStatus) =>
+  status.charAt(0).toUpperCase() + status.slice(1);
+
+const isValidImageUrl = (imageUrl: string) => {
+  try {
+    const url = new URL(imageUrl);
+
+    const allowedHosts = ["i.ibb.co", "i.ibb.co.com", "images.unsplash.com"];
+
+    return url.protocol === "https:" && allowedHosts.includes(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
 export default function VendorMenuPage() {
-  const [menuItems, setMenuItems] = useState(initialMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [deleteItemId, setDeleteItemId] = useState<number | null>(null);
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -89,23 +92,65 @@ export default function VendorMenuPage() {
     image: "",
   });
 
+  const inputClass =
+    "w-full rounded-xl border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm text-[#24352C] outline-none transition placeholder:text-[#A5A192] focus:border-[#71866B] focus:ring-2 focus:ring-[#71866B]/15";
+
+  // Load menu items from MongoDB
+  const loadMenuItems = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_URL}/api/menu`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to load menu items.");
+      }
+
+      setMenuItems(data.menuItems || []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while loading menu items.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMenuItems();
+  }, []);
+
   const activeItems = menuItems.filter(
-    (item) => item.status === "Approved",
+    (item) => item.status === "approved" && item.isAvailable,
+  ).length;
+
+  const pendingItems = menuItems.filter(
+    (item) => item.status === "pending",
   ).length;
 
   const filteredItems = menuItems.filter((item) => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const matchesSearch =
+      item.name.toLowerCase().includes(search.toLowerCase()) ||
+      item.category.toLowerCase().includes(search.toLowerCase());
 
     const matchesFilter =
-      activeFilter === "All" || item.status === activeFilter;
+      activeFilter === "All" || getStatusLabel(item.status) === activeFilter;
 
     return matchesSearch && matchesFilter;
   });
 
   const openAddForm = () => {
     setEditingItem(null);
+
     setFormData({
       name: "",
       category: "Classic Pizza",
@@ -113,22 +158,28 @@ export default function VendorMenuPage() {
       price: "",
       image: "",
     });
+
+    setError("");
     setShowForm(true);
   };
 
   const openEditForm = (item: MenuItem) => {
     setEditingItem(item);
+
     setFormData({
       name: item.name,
       category: item.category,
       description: item.description,
       price: String(item.price),
-      image: item.image,
+      image: item.image || "",
     });
+
+    setError("");
     setShowForm(true);
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  // Add or update menu item
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (
@@ -141,55 +192,83 @@ export default function VendorMenuPage() {
       return;
     }
 
-    if (!editingItem && activeItems >= 3) {
-      alert(
-        "Your Free Plan allows a maximum of 3 approved menu items. Upgrade your plan to add more.",
-      );
-      return;
-    }
+    try {
+      setSaving(true);
+      setError("");
 
-    if (editingItem) {
-      setMenuItems((previous) =>
-        previous.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                ...formData,
-                price: Number(formData.price),
-              }
-            : item,
-        ),
-      );
-    } else {
-      setMenuItems((previous) => [
-        ...previous,
-        {
-          id: Date.now(),
+      const isEditing = Boolean(editingItem);
+
+      const url = isEditing
+        ? `${API_URL}/api/menu/${editingItem?._id}`
+        : `${API_URL}/api/menu`;
+
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           name: formData.name.trim(),
           category: formData.category,
           description: formData.description.trim(),
           price: Number(formData.price),
-          image: formData.image,
-          status: "Pending",
-        },
-      ]);
+          image: formData.image.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to save menu item.");
+      }
+
+      setShowForm(false);
+      setEditingItem(null);
+
+      await loadMenuItems();
+
+      alert(
+        isEditing
+          ? "Menu item updated successfully!"
+          : "Menu item submitted for approval!",
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
     }
-
-    setShowForm(false);
   };
 
-  const handleDelete = () => {
-    if (deleteItemId === null) return;
+  // Delete menu item
+  const handleDelete = async () => {
+    if (!deleteItemId) return;
 
-    setMenuItems((previous) =>
-      previous.filter((item) => item.id !== deleteItemId),
-    );
+    try {
+      setDeleting(true);
 
-    setDeleteItemId(null);
+      const response = await fetch(`${API_URL}/api/menu/${deleteItemId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to delete menu item.");
+      }
+
+      setDeleteItemId(null);
+
+      await loadMenuItems();
+
+      alert("Menu item deleted successfully!");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setDeleting(false);
+    }
   };
-
-  const inputClass =
-    "w-full rounded-xl border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm text-[#24352C] outline-none transition placeholder:text-[#A5A192] focus:border-[#71866B] focus:ring-2 focus:ring-[#71866B]/15";
 
   return (
     <main className="min-h-screen bg-[#F7F5EF] text-[#24352C]">
@@ -203,6 +282,7 @@ export default function VendorMenuPage() {
             >
               Pizza<span className="text-[#C69B62]">Hub.</span>
             </Link>
+
             <p className="mt-1 text-xs tracking-[0.18em] text-[#71866B]">
               RESTAURANT PANEL
             </p>
@@ -239,9 +319,11 @@ export default function VendorMenuPage() {
           <div className="mt-auto p-5">
             <div className="rounded-2xl bg-[#172B25] p-5 text-white">
               <p className="text-sm font-semibold">Upgrade your plan</p>
+
               <p className="mt-2 text-xs leading-5 text-white/65">
                 Unlock unlimited menu items and grow your restaurant.
               </p>
+
               <Link
                 href="/dashboard/vendor/subscription"
                 className="mt-4 flex items-center justify-center rounded-lg bg-[#C69B62] px-3 py-2.5 text-xs font-bold text-[#172B25]"
@@ -262,9 +344,11 @@ export default function VendorMenuPage() {
               >
                 <ArrowLeft size={14} /> Back to Dashboard
               </Link>
+
               <h1 className="text-xl font-bold text-[#172B25] sm:text-2xl">
                 Menu Management
               </h1>
+
               <p className="mt-1 text-xs text-[#8A887B]">
                 Create and manage your restaurant menu.
               </p>
@@ -279,6 +363,19 @@ export default function VendorMenuPage() {
           </header>
 
           <div className="mx-auto max-w-7xl space-y-7 p-5 sm:p-8">
+            {/* Error Message */}
+            {error && (
+              <div className="rounded-xl border border-[#E9D1CD] bg-[#F5E2DF] p-4 text-sm text-[#A34D43]">
+                {error}
+                <button
+                  onClick={loadMenuItems}
+                  className="ml-3 font-bold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {/* Stats */}
             <div className="grid gap-4 sm:grid-cols-3">
               {[
@@ -292,9 +389,7 @@ export default function VendorMenuPage() {
                 },
                 {
                   label: "Pending Approval",
-                  value: menuItems.filter(
-                    (item) => item.status === "Pending",
-                  ).length,
+                  value: pendingItems,
                 },
               ].map((stat) => (
                 <div
@@ -302,6 +397,7 @@ export default function VendorMenuPage() {
                   className="rounded-2xl border border-[#DED8C9] bg-[#FBF8F1] p-5"
                 >
                   <p className="text-sm text-[#777568]">{stat.label}</p>
+
                   <h2 className="mt-3 text-3xl font-bold text-[#172B25]">
                     {stat.value}
                   </h2>
@@ -315,8 +411,10 @@ export default function VendorMenuPage() {
                 <p className="font-bold text-[#6F542F]">
                   Free Plan: {activeItems}/3 Active Menu Items
                 </p>
+
                 <p className="mt-1 text-xs leading-5 text-[#8B7555]">
-                  Only approved items count toward your free plan limit.
+                  Only approved and available items count toward your free plan
+                  limit.
                 </p>
               </div>
 
@@ -335,6 +433,7 @@ export default function VendorMenuPage() {
                   size={18}
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-[#929082]"
                 />
+
                 <input
                   type="text"
                   placeholder="Search menu items..."
@@ -346,7 +445,8 @@ export default function VendorMenuPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <Filter size={16} className="mr-1 text-[#929082]" />
-                {["All", "Approved", "Pending", "Rejected"].map((filter) => (
+
+                {filters.map((filter) => (
                   <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
@@ -362,50 +462,63 @@ export default function VendorMenuPage() {
               </div>
             </div>
 
-            {/* Menu Cards */}
-            {filteredItems.length === 0 ? (
+            {/* Loading */}
+            {loading ? (
+              <div className="rounded-2xl border border-[#DED8C9] bg-[#FBF8F1] px-5 py-16 text-center">
+                <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#DED8C9] border-t-[#42634D]" />
+                <p className="mt-4 text-sm text-[#777568]">
+                  Loading your menu items...
+                </p>
+              </div>
+            ) : filteredItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#C9C2B2] bg-[#FBF8F1] px-5 py-16 text-center">
-                <Package
-                  size={36}
-                  className="mx-auto text-[#A5A192]"
-                />
+                <Package size={36} className="mx-auto text-[#A5A192]" />
+
                 <h3 className="mt-4 font-bold text-[#29483A]">
                   No menu items found
                 </h3>
+
                 <p className="mt-2 text-sm text-[#8A887B]">
                   Try another search or add a new menu item.
                 </p>
               </div>
             ) : (
+              /* Menu Cards */
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {filteredItems.map((item) => (
                   <div
-                    key={item.id}
+                    key={item._id}
                     className="overflow-hidden rounded-2xl border border-[#DED8C9] bg-[#FBF8F1] transition hover:-translate-y-1 hover:shadow-lg hover:shadow-[#172B25]/5"
                   >
                     <div className="relative h-48 overflow-hidden bg-[#EAE7DE]">
-                      {item.image ? (
-                        <img
+                      {item.image && isValidImageUrl(item.image) ? (
+                        <Image
                           src={item.image}
                           alt={item.name}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                          loading="eager"
+                          className="object-cover"
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-[#929082]">
+                        <div className="flex h-full flex-col items-center justify-center gap-2 text-[#929082]">
                           <Package size={42} />
+                          <span className="text-xs">
+                            No valid image available
+                          </span>
                         </div>
                       )}
 
                       <span
                         className={`absolute right-3 top-3 rounded-full px-3 py-1.5 text-[10px] font-bold ${
-                          item.status === "Approved"
+                          item.status === "approved"
                             ? "bg-[#E4EDE3] text-[#42634D]"
-                            : item.status === "Pending"
+                            : item.status === "pending"
                               ? "bg-[#F8EBD2] text-[#9A6A20]"
                               : "bg-[#F5E2DF] text-[#A34D43]"
                         }`}
                       >
-                        {item.status}
+                        {getStatusLabel(item.status)}
                       </span>
                     </div>
 
@@ -418,8 +531,9 @@ export default function VendorMenuPage() {
                         <h3 className="font-bold text-[#172B25]">
                           {item.name}
                         </h3>
+
                         <p className="shrink-0 font-bold text-[#42634D]">
-                          ${item.price.toFixed(2)}
+                          ${Number(item.price).toFixed(2)}
                         </p>
                       </div>
 
@@ -436,7 +550,7 @@ export default function VendorMenuPage() {
                         </button>
 
                         <button
-                          onClick={() => setDeleteItemId(item.id)}
+                          onClick={() => setDeleteItemId(item._id)}
                           className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#E9D1CD] py-2.5 text-xs font-semibold text-[#A34D43] transition hover:bg-[#F5E2DF]"
                         >
                           <Trash2 size={14} /> Delete
@@ -445,7 +559,7 @@ export default function VendorMenuPage() {
                         <button
                           onClick={() =>
                             alert(
-                              `${item.name}\n\n${item.description}\n\nPrice: $${item.price.toFixed(2)}\nStatus: ${item.status}`,
+                              `${item.name}\n\n${item.description}\n\nPrice: $${Number(item.price).toFixed(2)}\nStatus: ${getStatusLabel(item.status)}`,
                             )
                           }
                           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#DED8C9] text-[#777568] hover:bg-[#F0EDE4]"
@@ -472,6 +586,7 @@ export default function VendorMenuPage() {
                 <h2 className="text-lg font-bold text-[#172B25]">
                   {editingItem ? "Edit Menu Item" : "Add New Menu Item"}
                 </h2>
+
                 <p className="mt-1 text-xs text-[#8A887B]">
                   Enter your pizza details below.
                 </p>
@@ -491,10 +606,11 @@ export default function VendorMenuPage() {
                 <label className="mb-2 block text-xs font-semibold text-[#526153]">
                   Item Name *
                 </label>
+
                 <input
                   type="text"
                   required
-                  maxLength={100}
+                  maxLength={120}
                   placeholder="e.g. Italian Margherita Pizza"
                   value={formData.name}
                   onChange={(event) =>
@@ -511,6 +627,7 @@ export default function VendorMenuPage() {
                 <label className="mb-2 block text-xs font-semibold text-[#526153]">
                   Category *
                 </label>
+
                 <select
                   value={formData.category}
                   onChange={(event) =>
@@ -534,9 +651,10 @@ export default function VendorMenuPage() {
                 <label className="mb-2 block text-xs font-semibold text-[#526153]">
                   Description *
                 </label>
+
                 <textarea
                   required
-                  maxLength={500}
+                  maxLength={1000}
                   rows={3}
                   placeholder="Describe your delicious menu item..."
                   value={formData.description}
@@ -554,6 +672,7 @@ export default function VendorMenuPage() {
                 <label className="mb-2 block text-xs font-semibold text-[#526153]">
                   Price (USD) *
                 </label>
+
                 <input
                   type="number"
                   required
@@ -575,6 +694,7 @@ export default function VendorMenuPage() {
                 <label className="mb-2 block text-xs font-semibold text-[#526153]">
                   Image URL
                 </label>
+
                 <input
                   type="url"
                   placeholder="https://example.com/pizza.jpg"
@@ -593,6 +713,7 @@ export default function VendorMenuPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
+                  disabled={saving}
                   className="rounded-xl border border-[#DED8C9] px-5 py-3 text-sm font-semibold text-[#706F63] hover:bg-[#F0EDE4]"
                 >
                   Cancel
@@ -600,9 +721,14 @@ export default function VendorMenuPage() {
 
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#172B25] px-6 py-3 text-sm font-semibold text-white hover:bg-[#29483A]"
+                  disabled={saving}
+                  className="rounded-xl bg-[#172B25] px-6 py-3 text-sm font-semibold text-white hover:bg-[#29483A] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {editingItem ? "Save Changes" : "Submit for Approval"}
+                  {saving
+                    ? "Saving..."
+                    : editingItem
+                      ? "Save Changes"
+                      : "Submit for Approval"}
                 </button>
               </div>
             </form>
@@ -630,6 +756,7 @@ export default function VendorMenuPage() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setDeleteItemId(null)}
+                disabled={deleting}
                 className="flex-1 rounded-xl border border-[#DED8C9] py-3 text-sm font-semibold text-[#706F63] hover:bg-[#F0EDE4]"
               >
                 Cancel
@@ -637,9 +764,10 @@ export default function VendorMenuPage() {
 
               <button
                 onClick={handleDelete}
-                className="flex-1 rounded-xl bg-[#A34D43] py-3 text-sm font-semibold text-white hover:bg-[#8D3F36]"
+                disabled={deleting}
+                className="flex-1 rounded-xl bg-[#A34D43] py-3 text-sm font-semibold text-white hover:bg-[#8D3F36] disabled:opacity-60"
               >
-                Delete
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
