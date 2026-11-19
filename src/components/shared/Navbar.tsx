@@ -45,8 +45,12 @@ export default function Navbar() {
     { name: "Home", href: "/" },
     { name: "Our Menu", href: "/menu" },
     { name: "About Us", href: "/about" },
-    { name: "Contact", href: "/contact" },
   ];
+
+  const handleDashboard = () => {
+    setIsOpen(false);
+    router.push(isLoggedIn ? dashboardLink : "/login");
+  };
 
   const handleLogout = async () => {
     try {
@@ -102,6 +106,13 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
+
+          <button
+            onClick={handleDashboard}
+            className="text-sm font-semibold text-[#24352C] transition-colors hover:text-[#C69B62]"
+          >
+            Dashboard
+          </button>
         </div>
 
         {/* Desktop Right Actions */}
@@ -123,7 +134,6 @@ export default function Navbar() {
 
             /* Logged In User */
             <div className="relative">
-
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2 rounded-full border border-[#DED8C9] bg-white px-3 py-2 transition hover:border-[#C69B62]"
@@ -162,16 +172,6 @@ export default function Navbar() {
                   </div>
 
                   <div className="p-2">
-
-                    <Link
-                      href={dashboardLink}
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#24352C] transition hover:bg-[#E8E5D9]"
-                    >
-                      <LayoutDashboard size={17} />
-                      My Dashboard
-                    </Link>
-
                     {role === "customer" && (
                       <>
                         <Link
@@ -193,7 +193,6 @@ export default function Navbar() {
                         </Link>
                       </>
                     )}
-
                   </div>
 
                   <div className="border-t border-[#DED8C9] p-2">
@@ -256,6 +255,14 @@ export default function Navbar() {
               </Link>
             ))}
 
+            <button
+              onClick={handleDashboard}
+              className="flex items-center gap-3 text-left text-sm font-semibold text-[#24352C]"
+            >
+              <LayoutDashboard size={18} />
+              Dashboard
+            </button>
+
             <div className="border-t border-[#DED8C9] pt-5">
 
               {isPending ? (
@@ -274,17 +281,12 @@ export default function Navbar() {
                       <p className="truncate text-xs text-[#706F63]">
                         {user.email}
                       </p>
+
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#42634D]">
+                        {role}
+                      </span>
                     </div>
                   </div>
-
-                  <Link
-                    href={dashboardLink}
-                    onClick={closeMobileMenu}
-                    className="flex items-center gap-3 text-sm font-semibold text-[#24352C]"
-                  >
-                    <LayoutDashboard size={18} />
-                    My Dashboard
-                  </Link>
 
                   {role === "customer" && (
                     <>

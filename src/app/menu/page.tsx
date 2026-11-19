@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import Navbar from "@/components/shared/Navbar";
+import Footer from "@/components/shared/Footer";
 
 type MenuItem = {
   _id: string;
@@ -135,21 +137,8 @@ export default function MenuPage() {
 
   return (
     <main className="min-h-screen bg-[#FBF8F1] text-[#24352C]">
-      {/* Back to Home */}
-      <div className="border-b border-[#DED8C9] bg-[#FBF8F1] px-5 py-4 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-7xl">
-          <Link
-            href="/"
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-[#42634D] transition hover:text-[#C69B62]"
-          >
-            <ArrowLeft
-              size={17}
-              className="transition-transform group-hover:-translate-x-1"
-            />
-            Back to Home
-          </Link>
-        </div>
-      </div>
+      <Navbar />
+      
 
       {/* Page Heading */}
       <section className="border-b border-[#DED8C9] bg-[#F2EBDD] px-5 py-16 text-center sm:py-20">
@@ -381,6 +370,7 @@ export default function MenuPage() {
           </div>
         )}
       </section>
+      <Footer />
     </main>
   );
 }
