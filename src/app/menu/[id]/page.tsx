@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -34,7 +34,7 @@ type MenuItem = {
   };
 };
 
-export default function PizzaDetailsPage() {
+function PizzaDetailsContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -279,5 +279,26 @@ export default function PizzaDetailsPage() {
         </div>
       </section>
     </main>
+  );
+}
+export default function PizzaDetailsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-[70vh] items-center justify-center bg-[#FBF8F1]">
+          <div className="text-center">
+            <LoaderCircle
+              size={40}
+              className="mx-auto animate-spin text-[#42634D]"
+            />
+            <p className="mt-4 text-sm font-medium text-[#706F63]">
+              Loading pizza details...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <PizzaDetailsContent />
+    </Suspense>
   );
 }
