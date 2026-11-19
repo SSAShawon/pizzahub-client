@@ -1,9 +1,9 @@
-
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ShoppingBag,
   Clock3,
@@ -32,6 +32,46 @@ export default function CustomerDashboard() {
 
   const user = session?.user;
   const role = user?.role || "customer";
+  type CustomerOrder = {
+    _id: string;
+    pizzaName: string;
+    pizzaImage: string;
+    quantity: number;
+    totalPrice: number;
+    status: "pending" | "accepted" | "rejected" | "cancelled";
+    restaurantName: string;
+    createdAt: string;
+  };
+
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
+  useEffect(() => {
+    if (isPending || !user || role !== "customer") return;
+
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch("/api/orders/my", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || "Unable to load orders.");
+        }
+
+        setOrders(data.orders || []);
+      } catch (error) {
+        console.error("Customer Orders Error:", error);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user, role, isPending]);
 
   useEffect(() => {
     if (isPending) return;
@@ -68,24 +108,32 @@ export default function CustomerDashboard() {
 
   const firstName = user.name?.trim().split(" ")[0] || "Food Lover";
 
+  const pendingOrders = orders.filter(
+    (order) => order.status === "pending",
+  ).length;
+
+  const acceptedOrders = orders.filter(
+    (order) => order.status === "accepted",
+  ).length;
+
   const stats = [
     {
       label: "Total Orders",
-      value: "0",
+      value: String(orders.length),
       icon: ShoppingBag,
       description: "Your order history",
     },
     {
       label: "Pending Orders",
-      value: "0",
+      value: String(pendingOrders),
       icon: Clock3,
       description: "Waiting for confirmation",
     },
     {
-      label: "Completed Orders",
-      value: "0",
+      label: "Accepted Orders",
+      value: String(acceptedOrders),
       icon: CheckCircle2,
-      description: "Successfully delivered",
+      description: "Confirmed by restaurants",
     },
     {
       label: "My Favorites",
@@ -101,7 +149,6 @@ export default function CustomerDashboard() {
 
       {/* Dashboard Content */}
       <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
-
         {/* Welcome Section */}
         <div className="relative overflow-hidden rounded-3xl bg-[#172B25] px-6 py-8 text-white shadow-xl sm:px-10 sm:py-10">
           <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[35px] border-white/5" />
@@ -119,8 +166,8 @@ export default function CustomerDashboard() {
               </h1>
 
               <p className="mt-4 max-w-xl text-sm leading-7 text-white/65 sm:text-base">
-                Your next delicious moment is just a few clicks away.
-                Explore our handcrafted pizzas and make every meal special.
+                Your next delicious moment is just a few clicks away. Explore
+                our handcrafted pizzas and make every meal special.
               </p>
 
               <Link
@@ -136,7 +183,11 @@ export default function CustomerDashboard() {
             <div className="hidden shrink-0 md:block">
               <div className="flex h-36 w-36 items-center justify-center rounded-full border border-[#C69B62]/30 bg-white/5">
                 <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#29483A]">
-                  <Pizza size={62} className="text-[#E0BD8A]" strokeWidth={1.2} />
+                  <Pizza
+                    size={62}
+                    className="text-[#E0BD8A]"
+                    strokeWidth={1.2}
+                  />
                 </div>
               </div>
             </div>
@@ -186,7 +237,7 @@ export default function CustomerDashboard() {
 
         {/* Main Dashboard Grid */}
         <div className="mt-10 grid grid-cols-1 gap-7 lg:grid-cols-3">
-
+          {/* Recent Orders */}
           {/* Recent Orders */}
           <div className="rounded-2xl border border-[#DED8C9] bg-white p-6 shadow-sm lg:col-span-2">
             <div className="flex items-center justify-between gap-3">
@@ -200,32 +251,102 @@ export default function CustomerDashboard() {
               </div>
 
               <span className="rounded-full bg-[#E8EDE5] px-3 py-1.5 text-xs font-semibold text-[#42634D]">
-                0 Orders
+                {orders.length} Orders
               </span>
             </div>
 
-            <div className="mt-7 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#DED8C9] bg-[#FBF8F1] px-5 py-12 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#E8EDE5] text-[#42634D]">
-                <PackageCheck size={31} strokeWidth={1.5} />
+            {ordersLoading ? (
+              <div className="mt-7 flex items-center justify-center rounded-2xl bg-[#FBF8F1] px-5 py-12">
+                <p className="text-sm font-medium text-[#706F63]">
+                  Loading your orders...
+                </p>
               </div>
+            ) : orders.length === 0 ? (
+              <div className="mt-7 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#DED8C9] bg-[#FBF8F1] px-5 py-12 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#E8EDE5] text-[#42634D]">
+                  <PackageCheck size={31} strokeWidth={1.5} />
+                </div>
 
-              <h3 className="mt-5 font-serif text-lg font-bold text-[#172B25]">
-                No Orders Yet
-              </h3>
+                <h3 className="mt-5 font-serif text-lg font-bold text-[#172B25]">
+                  No Orders Yet
+                </h3>
 
-              <p className="mt-2 max-w-sm text-sm leading-6 text-[#858174]">
-                Your delicious journey starts here. Browse our menu and
-                discover your new favorite pizza.
-              </p>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-[#858174]">
+                  Your delicious journey starts here. Browse our menu and
+                  discover your new favorite pizza.
+                </p>
 
-              <Link
-                href="/menu"
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#29483A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#172B25]"
-              >
-                Order Your First Pizza
-                <ArrowRight size={16} />
-              </Link>
-            </div>
+                <Link
+                  href="/menu"
+                  className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#29483A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#172B25]"
+                >
+                  Order Your First Pizza
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                {orders.slice(0, 3).map((order) => (
+                  <div
+                    key={order._id}
+                    className="flex flex-col gap-4 rounded-xl border border-[#DED8C9] p-4 sm:flex-row sm:items-center"
+                  >
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#F2EBDD]">
+                      {order.pizzaImage ? (
+                        <Image
+                          src={order.pizzaImage}
+                          alt={order.pizzaName}
+                          width={80}
+                          height={80}
+                          unoptimized
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-[#42634D]">
+                          <Pizza size={30} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-[#29483A]">
+                        {order.pizzaName}
+                      </h3>
+
+                      <p className="mt-1 text-xs text-[#858174]">
+                        {order.restaurantName} · Quantity: {order.quantity}
+                      </p>
+
+                      <p className="mt-2 text-sm font-bold text-[#172B25]">
+                        ৳{Number(order.totalPrice).toFixed(2)}
+                      </p>
+
+                      <p className="mt-1 text-xs text-[#858174]">
+                        {new Date(order.createdAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`w-fit rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+                        order.status === "pending"
+                          ? "bg-amber-100 text-amber-700"
+                          : order.status === "accepted"
+                            ? "bg-green-100 text-green-700"
+                            : order.status === "rejected"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {order.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Actions */}
@@ -268,9 +389,7 @@ export default function CustomerDashboard() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#29483A]">
-                    My Orders
-                  </p>
+                  <p className="text-sm font-bold text-[#29483A]">My Orders</p>
                   <p className="mt-1 text-xs text-[#858174]">
                     Order history coming soon
                   </p>
@@ -393,7 +512,6 @@ export default function CustomerDashboard() {
             </button>
           </div>
         </div>
-
       </section>
 
       <Footer />

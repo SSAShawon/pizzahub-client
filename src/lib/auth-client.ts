@@ -23,6 +23,14 @@ export const authClient = createAuthClient({
           type: "boolean",
           required: false,
         },
+        deliveryAddress: {
+          type: "string",
+          required: false,
+        },
+        phoneNumber: {
+          type: "string",
+          required: false,
+        },
       },
     }),
   ],
