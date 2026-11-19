@@ -1,3 +1,4 @@
+
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -12,6 +13,13 @@ const nextConfig: NextConfig = {
           process.env.NODE_ENV === "development"
             ? "http://localhost:5000/api/auth/:path*"
             : "https://pizzahub-server-ten.vercel.app/api/auth/:path*",
+      },
+      {
+        source: "/api/:path*",
+        destination:
+          process.env.NODE_ENV === "development"
+            ? "http://localhost:5000/api/:path*"
+            : "https://pizzahub-server-ten.vercel.app/api/:path*",
       },
     ];
   },
