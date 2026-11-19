@@ -65,7 +65,7 @@ export default function FeaturedPizzas() {
             item.status === "approved" && item.isAvailable === true,
         );
 
-        setPizzas(availablePizzas.slice(0, 3));
+        setPizzas(availablePizzas.slice(0, 6));
       } catch (err) {
         console.error("Featured Pizzas Error:", err);
 
