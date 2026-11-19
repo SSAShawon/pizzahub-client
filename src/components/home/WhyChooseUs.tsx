@@ -44,12 +44,12 @@ const features = [
 
 export default function WhyChooseUs() {
   return (
-    <section className="bg-[#F2EBDD] px-5 py-16 sm:px-8 lg:px-12 lg:py-20">
+    <section className="bg-[#F2EBDD] px-5 py-12 sm:px-8 lg:px-12 lg:py-16">
       <div className="mx-auto max-w-7xl">
         {/* Heading */}
-        <div className="mb-9 grid gap-4 md:grid-cols-2 md:items-end">
+        <div className="mb-7 grid gap-3 md:grid-cols-2 md:items-end">
           <div>
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-3 flex items-center gap-3">
               <span className="h-px w-8 bg-[#C69B62]" />
               <span className="text-[10px] font-bold uppercase tracking-[3px] text-[#71866B]">
                 The PizzaHub Difference
@@ -65,50 +65,47 @@ export default function WhyChooseUs() {
             </h2>
           </div>
 
-          <p className="max-w-md text-sm leading-7 text-[#706F63] md:ml-auto">
+          <p className="max-w-md text-sm leading-6 text-[#706F63] md:ml-auto">
             Great pizza starts with great choices. From fresh ingredients
             to careful preparation, every detail matters.
           </p>
         </div>
 
-        {/* Features */}
-        <div className="grid border-l border-t border-[#D8D0BF] sm:grid-cols-2 lg:grid-cols-4">
+        {/* Four Features in One Row */}
+        <div className="grid grid-cols-2 border-l border-t border-[#D8D0BF] md:grid-cols-4">
           {features.map((feature) => {
             const Icon = feature.icon;
 
             return (
               <article
                 key={feature.number}
-                className="group flex min-h-[255px] flex-col border-b border-r border-[#D8D0BF] p-5 transition-colors hover:bg-[#FBF8F1] sm:p-6"
+                className="group flex min-h-[210px] flex-col border-b border-r border-[#D8D0BF] p-3 transition-colors hover:bg-[#FBF8F1] sm:p-5 lg:min-h-[220px] lg:p-4 xl:p-5"
               >
-                {/* Top */}
                 <div className="flex items-center justify-between">
                   <span className="font-serif text-2xl text-[#C69B62]">
                     {feature.number}
                   </span>
 
                   <ArrowUpRight
-                    size={17}
+                    size={16}
                     className="text-[#A39B89] transition-transform group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-[#C69B62]"
                   />
                 </div>
 
-                {/* Icon */}
-                <div className="my-5 flex h-11 w-11 items-center justify-center border border-[#C69B62]/40 bg-[#FBF8F1] text-[#42634D] transition-colors group-hover:bg-[#29483A] group-hover:text-[#F2EBDD]">
-                  <Icon size={21} strokeWidth={1.6} />
+                <div className="my-3 flex h-10 w-10 items-center justify-center border border-[#C69B62]/40 bg-[#FBF8F1] text-[#42634D] transition-colors group-hover:bg-[#29483A] group-hover:text-[#F2EBDD]">
+                  <Icon size={19} strokeWidth={1.6} />
                 </div>
 
-                {/* Content */}
                 <div className="mt-auto">
-                  <p className="mb-2 text-[9px] font-bold tracking-[1.5px] text-[#8A896F]">
+                  <p className="mb-1 text-[8px] font-bold tracking-[1px] text-[#8A896F]">
                     {feature.detail}
                   </p>
 
-                  <h3 className="font-serif text-xl text-[#172B25]">
+                  <h3 className="font-serif text-lg leading-tight text-[#172B25]">
                     {feature.title}
                   </h3>
 
-                  <p className="mt-2 text-xs leading-6 text-[#706F63]">
+                  <p className="mt-2 line-clamp-3 text-xs leading-5 text-[#706F63]">
                     {feature.description}
                   </p>
                 </div>
@@ -118,8 +115,8 @@ export default function WhyChooseUs() {
         </div>
 
         {/* Bottom Message */}
-        <div className="mt-7 flex flex-col justify-between gap-3 border-b border-[#D8D0BF] pb-5 sm:flex-row sm:items-center">
-          <p className="font-serif text-lg italic text-[#42634D] sm:text-xl">
+        <div className="mt-5 flex flex-col justify-between gap-2 border-b border-[#D8D0BF] pb-4 sm:flex-row sm:items-center">
+          <p className="font-serif text-base italic text-[#42634D] sm:text-lg">
             Quality is never just an ingredient. It&apos;s our promise.
           </p>
 
