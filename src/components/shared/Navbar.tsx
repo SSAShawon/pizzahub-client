@@ -175,6 +175,15 @@ export default function Navbar() {
                     {role === "customer" && (
                       <>
                         <Link
+                          href="/profile"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#24352C] transition hover:bg-[#E8E5D9]"
+                        >
+                          <UserCircle size={17} />
+                          My Profile
+                        </Link>
+
+                        <Link
                           href="/dashboard/customer/orders"
                           onClick={() => setProfileOpen(false)}
                           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#24352C] transition hover:bg-[#E8E5D9]"
@@ -290,6 +299,15 @@ export default function Navbar() {
 
                   {role === "customer" && (
                     <>
+                      <Link
+                        href="/profile"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-3 text-sm font-medium text-[#24352C]"
+                      >
+                        <UserCircle size={18} />
+                        My Profile
+                      </Link>
+
                       <Link
                         href="/dashboard/customer/orders"
                         onClick={closeMobileMenu}

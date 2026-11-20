@@ -17,6 +17,7 @@ import {
   Minus,
   Plus,
   X,
+  CalendarDays,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
@@ -37,6 +38,16 @@ type MenuItem = {
   };
 };
 
+// Get today's date using the user's local calendar date
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 function PizzaDetailsContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -54,6 +65,7 @@ function PizzaDetailsContent() {
   const [quantity, setQuantity] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState(getTodayDate);
   const [specialInstructions, setSpecialInstructions] = useState("");
 
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -148,6 +160,7 @@ function PizzaDetailsContent() {
           quantity,
           phoneNumber,
           deliveryAddress,
+          deliveryDate,
           specialInstructions,
         }),
       });
@@ -159,12 +172,13 @@ function PizzaDetailsContent() {
       }
 
       setOrderSuccess(
-        "Your order has been placed successfully! The restaurant will review your order shortly.",
+        `Your order has been placed successfully for ${deliveryDate}! The restaurant will review your order shortly.`,
       );
 
       setQuantity(1);
       setPhoneNumber("");
       setDeliveryAddress("");
+      setDeliveryDate(getTodayDate());
       setSpecialInstructions("");
       setShowOrderForm(false);
     } catch (err) {
@@ -373,7 +387,9 @@ function PizzaDetailsContent() {
                           <button
                             type="button"
                             onClick={() =>
-                              setQuantity((previous) => Math.max(1, previous - 1))
+                              setQuantity((previous) =>
+                                Math.max(1, previous - 1),
+                              )
                             }
                             disabled={quantity <= 1}
                             className="p-3 text-[#29483A] transition hover:bg-[#F2EBDD] disabled:cursor-not-allowed disabled:opacity-40"
@@ -389,7 +405,9 @@ function PizzaDetailsContent() {
                           <button
                             type="button"
                             onClick={() =>
-                              setQuantity((previous) => Math.min(20, previous + 1))
+                              setQuantity((previous) =>
+                                Math.min(20, previous + 1),
+                              )
                             }
                             disabled={quantity >= 20}
                             className="p-3 text-[#29483A] transition hover:bg-[#F2EBDD] disabled:cursor-not-allowed disabled:opacity-40"
@@ -398,6 +416,31 @@ function PizzaDetailsContent() {
                             <Plus size={17} />
                           </button>
                         </div>
+                      </div>
+
+                      {/* Delivery Date */}
+                      <div>
+                        <label
+                          htmlFor="order-delivery-date"
+                          className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#29483A]"
+                        >
+                          <CalendarDays size={17} />
+                          Delivery Date *
+                        </label>
+
+                        <input
+                          id="order-delivery-date"
+                          type="date"
+                          required
+                          min={getTodayDate()}
+                          value={deliveryDate}
+                          onChange={(e) => setDeliveryDate(e.target.value)}
+                          className="w-full rounded-xl border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm text-[#24352C] outline-none transition focus:border-[#71866B] focus:ring-2 focus:ring-[#71866B]/20"
+                        />
+
+                        <p className="mt-1.5 text-xs text-[#8A887C]">
+                          Choose today or a future date for your delivery.
+                        </p>
                       </div>
 
                       {/* Phone Number */}
@@ -496,7 +539,8 @@ function PizzaDetailsContent() {
                         </div>
 
                         <p className="mt-2 text-xs text-[#8A887C]">
-                          Delivery will be arranged as soon as possible.
+                          Your pizza will be scheduled for the selected
+                          delivery date.
                         </p>
                       </div>
 

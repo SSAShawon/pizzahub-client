@@ -1,8 +1,9 @@
+
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -11,7 +12,9 @@ import {
   Pizza,
   MapPin,
   Eye,
-  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
@@ -34,6 +37,17 @@ type MenuItem = {
   };
 };
 
+type Pagination = {
+  currentPage: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
+const ITEMS_PER_PAGE = 9;
+
 export default function MenuPage() {
   const router = useRouter();
 
@@ -42,23 +56,78 @@ export default function MenuPage() {
   const role = user?.role || "customer";
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
+  // Filter states
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [sortOrder, setSortOrder] = useState("default");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
-  // Fetch public menu from the backend
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<Pagination>({
+    currentPage: 1,
+    limit: ITEMS_PER_PAGE,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
+
+  // Debounce search input
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setCurrentPage(1);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Fetch menu from backend
+  useEffect(() => {
+    const controller = new AbortController();
+
     const fetchMenu = async () => {
       try {
         setLoading(true);
         setError("");
 
-        const response = await fetch("/api/menu/public", {
-          cache: "no-store",
-        });
+        const params = new URLSearchParams();
+
+        if (debouncedSearch) {
+          params.set("search", debouncedSearch);
+        }
+
+        if (selectedCategory !== "All") {
+          params.set("category", selectedCategory);
+        }
+
+        if (minPrice.trim()) {
+          params.set("minPrice", minPrice.trim());
+        }
+
+        if (maxPrice.trim()) {
+          params.set("maxPrice", maxPrice.trim());
+        }
+
+        params.set("sort", sortOrder);
+        params.set("page", String(currentPage));
+        params.set("limit", String(ITEMS_PER_PAGE));
+
+        const response = await fetch(
+          `/api/menu/public?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
 
         const data = await response.json();
 
@@ -67,7 +136,33 @@ export default function MenuPage() {
         }
 
         setMenuItems(data.menuItems || []);
+
+        // Categories now come from the backend,
+        // so all categories remain available across pages.
+        if (Array.isArray(data.categories)) {
+          setCategories(
+            data.categories.filter(
+              (category: unknown): category is string =>
+                typeof category === "string" && category.trim().length > 0,
+            ),
+          );
+        }
+
+        setPagination(
+          data.pagination || {
+            currentPage,
+            limit: ITEMS_PER_PAGE,
+            totalItems: (data.menuItems || []).length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+        );
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+
         console.error("Menu Fetch Error:", err);
 
         setError(
@@ -76,52 +171,70 @@ export default function MenuPage() {
             : "Something went wrong while loading the menu.",
         );
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMenu();
-  }, []);
 
-  // Get unique categories from the menu
-  const categories = useMemo(() => {
-    const uniqueCategories = [
-      ...new Set(menuItems.map((item) => item.category)),
-    ];
+    return () => controller.abort();
+  }, [
+    debouncedSearch,
+    selectedCategory,
+    sortOrder,
+    minPrice,
+    maxPrice,
+    currentPage,
+    retryKey,
+  ]);
 
-    return ["All", ...uniqueCategories];
-  }, [menuItems]);
+  // All categories received from backend
+  const allCategories = [
+    "All",
+    ...new Set([
+      ...categories,
+      ...(selectedCategory !== "All" ? [selectedCategory] : []),
+    ]),
+  ];
 
-  // Search, filter and sort pizzas
-  const filteredMenu = useMemo(() => {
-    let result = [...menuItems];
+  // Handle filter changes
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+  };
 
-    if (search.trim()) {
-      const searchText = search.toLowerCase();
+  const handleSortChange = (value: string) => {
+    setSortOrder(value);
+    setCurrentPage(1);
+  };
 
-      result = result.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchText) ||
-          item.description.toLowerCase().includes(searchText) ||
-          item.category.toLowerCase().includes(searchText) ||
-          item.vendor?.restaurantName?.toLowerCase().includes(searchText),
-      );
+  const handlePriceChange = (
+    setter: (value: string) => void,
+    value: string,
+  ) => {
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      setter(value);
+      setCurrentPage(1);
     }
+  };
 
-    if (selectedCategory !== "All") {
-      result = result.filter((item) => item.category === selectedCategory);
-    }
+  // Clear all filters
+  const clearFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setSelectedCategory("All");
+    setSortOrder("newest");
+    setMinPrice("");
+    setMaxPrice("");
+    setCurrentPage(1);
+  };
 
-    if (sortOrder === "low-to-high") {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sortOrder === "high-to-low") {
-      result.sort((a, b) => b.price - a.price);
-    } else if (sortOrder === "name") {
-      result.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    return result;
-  }, [menuItems, search, selectedCategory, sortOrder]);
+  // Retry fetching menu
+  const handleRetry = () => {
+    setRetryKey((previous) => previous + 1);
+  };
 
   // Handle Order button
   const handleOrder = (itemId: string) => {
@@ -138,7 +251,6 @@ export default function MenuPage() {
   return (
     <main className="min-h-screen bg-[#FBF8F1] text-[#24352C]">
       <Navbar />
-      
 
       {/* Page Heading */}
       <section className="border-b border-[#DED8C9] bg-[#F2EBDD] px-5 py-16 text-center sm:py-20">
@@ -153,17 +265,16 @@ export default function MenuPage() {
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#706F63] sm:text-base">
-            Discover handcrafted pizzas made with fresh ingredients, authentic
-            flavors, and a passion for great food.
+            Discover handcrafted pizzas made with fresh ingredients,
+            authentic flavors, and a passion for great food.
           </p>
         </div>
       </section>
 
       {/* Menu Content */}
       <section className="mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:px-10">
-        {/* Search and Sorting */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Search */}
+        {/* Search */}
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">
             <Search
               size={19}
@@ -174,7 +285,7 @@ export default function MenuPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search pizzas, categories..."
+              placeholder="Search pizzas, categories, restaurants..."
               className="w-full rounded-xl border border-[#DED8C9] bg-white py-3.5 pl-12 pr-4 text-sm text-[#24352C] outline-none transition placeholder:text-[#A09B8D] focus:border-[#42634D] focus:ring-2 focus:ring-[#42634D]/10"
             />
           </div>
@@ -188,23 +299,85 @@ export default function MenuPage() {
 
             <select
               value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
+              onChange={(e) => handleSortChange(e.target.value)}
               className="w-full appearance-none rounded-xl border border-[#DED8C9] bg-white py-3.5 pl-11 pr-4 text-sm text-[#24352C] outline-none focus:border-[#42634D]"
             >
-              <option value="default">Default Sorting</option>
-              <option value="low-to-high">Price: Low to High</option>
-              <option value="high-to-low">Price: High to Low</option>
-              <option value="name">Name: A to Z</option>
+              <option value="newest">Newest First</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="name_asc">Name: A to Z</option>
+              <option value="name_desc">Name: Z to A</option>
             </select>
+          </div>
+        </div>
+
+        {/* Price Filters */}
+        <div className="mb-8 rounded-2xl border border-[#DED8C9] bg-white p-4 sm:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <SlidersHorizontal size={18} className="text-[#42634D]" />
+            <h2 className="text-sm font-bold text-[#172B25]">
+              Filter By Price
+            </h2>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="w-full">
+              <label
+                htmlFor="min-price"
+                className="mb-1.5 block text-xs font-medium text-[#706F63]"
+              >
+                Minimum Price ($)
+              </label>
+
+              <input
+                id="min-price"
+                type="text"
+                inputMode="decimal"
+                value={minPrice}
+                onChange={(e) =>
+                  handlePriceChange(setMinPrice, e.target.value)
+                }
+                placeholder="e.g. 5"
+                className="w-full rounded-xl border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm outline-none focus:border-[#42634D]"
+              />
+            </div>
+
+            <div className="w-full">
+              <label
+                htmlFor="max-price"
+                className="mb-1.5 block text-xs font-medium text-[#706F63]"
+              >
+                Maximum Price ($)
+              </label>
+
+              <input
+                id="max-price"
+                type="text"
+                inputMode="decimal"
+                value={maxPrice}
+                onChange={(e) =>
+                  handlePriceChange(setMaxPrice, e.target.value)
+                }
+                placeholder="e.g. 25"
+                className="w-full rounded-xl border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm outline-none focus:border-[#42634D]"
+              />
+            </div>
+
+            <button
+              onClick={clearFilters}
+              className="w-full rounded-xl border border-[#29483A] px-5 py-3 text-sm font-semibold text-[#29483A] transition hover:bg-[#F2EBDD] sm:mt-5 sm:w-auto"
+            >
+              Clear Filters
+            </button>
           </div>
         </div>
 
         {/* Category Filters */}
         <div className="mb-10 flex flex-wrap gap-2">
-          {categories.map((category) => (
+          {allCategories.map((category) => (
             <button
               key={category}
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => handleCategoryChange(category)}
               className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${
                 selectedCategory === category
                   ? "bg-[#29483A] text-white shadow-md"
@@ -222,17 +395,26 @@ export default function MenuPage() {
             <p className="text-sm text-[#706F63]">
               Showing{" "}
               <span className="font-bold text-[#172B25]">
-                {filteredMenu.length}
+                {menuItems.length}
               </span>{" "}
-              {filteredMenu.length === 1 ? "pizza" : "pizzas"}
+              {menuItems.length === 1 ? "pizza" : "pizzas"}
+              <span className="ml-1">
+                ({pagination.totalItems} total)
+              </span>
             </p>
+
+            {pagination.totalPages > 0 && (
+              <p className="text-xs text-[#706F63]">
+                Page {pagination.currentPage} of {pagination.totalPages}
+              </p>
+            )}
           </div>
         )}
 
         {/* Loading State */}
         {loading && (
           <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((item) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((item) => (
               <div
                 key={item}
                 className="overflow-hidden rounded-2xl border border-[#DED8C9] bg-white"
@@ -251,12 +433,14 @@ export default function MenuPage() {
         {/* Error State */}
         {!loading && error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center">
-            <p className="font-semibold text-red-700">Unable to load pizzas</p>
+            <p className="font-semibold text-red-700">
+              Unable to load pizzas
+            </p>
 
             <p className="mt-2 text-sm text-red-600">{error}</p>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={handleRetry}
               className="mt-5 rounded-full bg-[#29483A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#172B25]"
             >
               Try Again
@@ -265,9 +449,9 @@ export default function MenuPage() {
         )}
 
         {/* Pizza Cards */}
-        {!loading && !error && filteredMenu.length > 0 && (
+        {!loading && !error && menuItems.length > 0 && (
           <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredMenu.map((item) => (
+            {menuItems.map((item) => (
               <article
                 key={item._id}
                 className="group overflow-hidden rounded-2xl border border-[#DED8C9] bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
@@ -345,7 +529,7 @@ export default function MenuPage() {
         )}
 
         {/* No Results */}
-        {!loading && !error && filteredMenu.length === 0 && (
+        {!loading && !error && menuItems.length === 0 && (
           <div className="rounded-2xl border border-[#DED8C9] bg-white px-6 py-16 text-center">
             <Pizza size={45} className="mx-auto text-[#71866B]" />
 
@@ -354,22 +538,52 @@ export default function MenuPage() {
             </h3>
 
             <p className="mt-2 text-sm text-[#706F63]">
-              Try another search term or select a different category.
+              Try another search term or adjust your filters.
             </p>
 
             <button
-              onClick={() => {
-                setSearch("");
-                setSelectedCategory("All");
-                setSortOrder("default");
-              }}
+              onClick={clearFilters}
               className="mt-6 rounded-full bg-[#29483A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#172B25]"
             >
               Clear Filters
             </button>
           </div>
         )}
+
+        {/* Pagination */}
+        {!loading && !error && pagination.totalPages > 1 && (
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() =>
+                setCurrentPage((page) => Math.max(1, page - 1))
+              }
+              disabled={!pagination.hasPreviousPage}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#DED8C9] bg-white px-4 py-3 text-sm font-semibold text-[#29483A] transition hover:bg-[#F2EBDD] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={17} />
+              Previous
+            </button>
+
+            <span className="rounded-xl bg-[#29483A] px-5 py-3 text-sm font-bold text-white">
+              {pagination.currentPage} / {pagination.totalPages}
+            </span>
+
+            <button
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.min(pagination.totalPages, page + 1),
+                )
+              }
+              disabled={!pagination.hasNextPage}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#DED8C9] bg-white px-4 py-3 text-sm font-semibold text-[#29483A] transition hover:bg-[#F2EBDD] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+              <ChevronRight size={17} />
+            </button>
+          </div>
+        )}
       </section>
+
       <Footer />
     </main>
   );

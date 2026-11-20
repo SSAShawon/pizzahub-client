@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import VendorSidebar from "@/components/dashboard/VendorSidebar";
 import {
   ArrowLeft,
-  ArrowRight,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   Eye,
@@ -42,6 +42,7 @@ type VendorOrder = {
   specialInstructions: string;
   status: OrderStatus;
   createdAt: string;
+  deliveryDate?: string;
 };
 
 const filters: { label: string; value: FilterStatus }[] = [
@@ -58,6 +59,20 @@ const statusStyles: Record<OrderStatus, string> = {
   rejected: "bg-red-100 text-red-700",
   cancelled: "bg-gray-100 text-gray-600",
 };
+
+function formatDeliveryDate(date?: string) {
+  if (!date) return "Not specified";
+
+  const [year, month, day] = date.split("-").map(Number);
+
+  if (!year || !month || !day) return "Not specified";
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function VendorOrdersPage() {
   const router = useRouter();
@@ -107,9 +122,7 @@ export default function VendorOrdersPage() {
 
       setOrders(data.orders || []);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -123,12 +136,12 @@ export default function VendorOrdersPage() {
 
   const handleStatusUpdate = async (
     orderId: string,
-    newStatus: "accepted" | "rejected"
+    newStatus: "accepted" | "rejected",
   ) => {
     const action = newStatus === "accepted" ? "accept" : "reject";
 
     const confirmed = window.confirm(
-      `Are you sure you want to ${action} this order?`
+      `Are you sure you want to ${action} this order?`,
     );
 
     if (!confirmed) return;
@@ -156,15 +169,13 @@ export default function VendorOrdersPage() {
       setSuccess(
         newStatus === "accepted"
           ? "Order accepted successfully."
-          : "Order rejected successfully."
+          : "Order rejected successfully.",
       );
 
       setSelectedOrder(null);
       await fetchOrders();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update order."
-      );
+      setError(err instanceof Error ? err.message : "Failed to update order.");
     } finally {
       setUpdatingId(null);
     }
@@ -189,11 +200,11 @@ export default function VendorOrdersPage() {
       : orders.filter((order) => order.status === filter);
 
   const pendingCount = orders.filter(
-    (order) => order.status === "pending"
+    (order) => order.status === "pending",
   ).length;
 
   const acceptedCount = orders.filter(
-    (order) => order.status === "accepted"
+    (order) => order.status === "accepted",
   ).length;
 
   const totalRevenue = orders
@@ -213,12 +224,9 @@ export default function VendorOrdersPage() {
   return (
     <main className="min-h-screen bg-[#F7F5EF] text-[#24352C]">
       <div className="flex min-h-screen flex-col lg:flex-row">
-        {/* Shared Vendor Sidebar */}
         <VendorSidebar />
 
-        {/* Main Content */}
         <section className="min-w-0 flex-1">
-          {/* Topbar */}
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#DED8C9] bg-[#FBF8F1] px-5 py-5 sm:px-8">
             <div>
               <p className="text-xs font-medium text-[#8A887B]">
@@ -267,7 +275,10 @@ export default function VendorOrdersPage() {
                 disabled={loading}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#C69B62] px-5 py-3 text-sm font-bold text-[#172B25] transition hover:bg-[#D5B27E] disabled:opacity-60"
               >
-                <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
+                <RefreshCw
+                  size={17}
+                  className={loading ? "animate-spin" : ""}
+                />
                 Refresh Orders
               </button>
             </div>
@@ -353,9 +364,8 @@ export default function VendorOrdersPage() {
                   const count =
                     item.value === "all"
                       ? orders.length
-                      : orders.filter(
-                          (order) => order.status === item.value
-                        ).length;
+                      : orders.filter((order) => order.status === item.value)
+                          .length;
 
                   return (
                     <button
@@ -415,9 +425,7 @@ export default function VendorOrdersPage() {
                   </div>
 
                   <h3 className="mt-5 font-bold text-[#172B25]">
-                    {filter === "all"
-                      ? "No Orders Yet"
-                      : `No ${filter} Orders`}
+                    {filter === "all" ? "No Orders Yet" : `No ${filter} Orders`}
                   </h3>
 
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#858174]">
@@ -481,7 +489,8 @@ export default function VendorOrdersPage() {
                             </span>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                          {/* Order Summary */}
+                          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                             <div>
                               <p className="text-xs text-[#858174]">Customer</p>
                               <p className="mt-1 truncate text-sm font-semibold text-[#29483A]">
@@ -497,9 +506,24 @@ export default function VendorOrdersPage() {
                             </div>
 
                             <div>
-                              <p className="text-xs text-[#858174]">Total Amount</p>
+                              <p className="text-xs text-[#858174]">
+                                Total Amount
+                              </p>
                               <p className="mt-1 text-sm font-bold text-[#172B25]">
                                 ৳{Number(order.totalPrice).toFixed(2)}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-[#858174]">
+                                Delivery Date
+                              </p>
+                              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-[#29483A]">
+                                <CalendarDays
+                                  size={15}
+                                  className="shrink-0 text-[#C69B62]"
+                                />
+                                {formatDeliveryDate(order.deliveryDate)}
                               </p>
                             </div>
                           </div>
@@ -630,6 +654,7 @@ export default function VendorOrdersPage() {
                 </div>
               </div>
 
+              {/* Customer Information */}
               <div className="rounded-xl border border-[#DED8C9] p-4">
                 <h3 className="mb-4 text-sm font-bold text-[#172B25]">
                   Customer Information
@@ -658,6 +683,7 @@ export default function VendorOrdersPage() {
                 </div>
               </div>
 
+              {/* Special Instructions */}
               <div className="rounded-xl border border-[#DED8C9] p-4">
                 <h3 className="mb-2 text-sm font-bold text-[#172B25]">
                   Special Instructions
@@ -668,7 +694,8 @@ export default function VendorOrdersPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Order Status, Order Date & Delivery Date */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <p className="text-xs text-[#858174]">Order Status</p>
                   <span
@@ -678,10 +705,21 @@ export default function VendorOrdersPage() {
                   </span>
                 </div>
 
-                <div className="text-right">
+                <div>
                   <p className="text-xs text-[#858174]">Order Date</p>
                   <p className="mt-2 text-sm font-semibold text-[#29483A]">
                     {formatDate(selectedOrder.createdAt)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-[#858174]">Delivery Date</p>
+                  <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-[#29483A]">
+                    <CalendarDays
+                      size={15}
+                      className="shrink-0 text-[#C69B62]"
+                    />
+                    {formatDeliveryDate(selectedOrder.deliveryDate)}
                   </p>
                 </div>
               </div>

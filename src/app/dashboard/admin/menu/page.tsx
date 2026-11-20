@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  ArrowUpRight,
   Check,
   CheckCircle2,
   Clock3,
@@ -16,6 +15,8 @@ import {
   UtensilsCrossed,
   X,
   XCircle,
+  Power,
+  Trash2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -29,11 +30,12 @@ type MenuItem = {
   vendorId: string;
   vendorEmail?: string;
   status: "pending" | "approved" | "rejected";
-  isAvailable: boolean;
+  isAvailable?: boolean;
   createdAt: string;
 };
 
 type FilterStatus = "all" | "pending" | "approved" | "rejected";
+type AvailabilityFilter = "all" | "active" | "inactive";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -66,6 +68,8 @@ export default function AdminMenuPage() {
   const [success, setSuccess] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>("all");
 
   const loadMenuItems = useCallback(async () => {
     try {
@@ -112,6 +116,12 @@ export default function AdminMenuPage() {
       pending: menuItems.filter((item) => item.status === "pending").length,
       approved: menuItems.filter((item) => item.status === "approved").length,
       rejected: menuItems.filter((item) => item.status === "rejected").length,
+      active: menuItems.filter(
+        (item) => item.status === "approved" && item.isAvailable === true,
+      ).length,
+      inactive: menuItems.filter(
+        (item) => item.status === "approved" && item.isAvailable !== true,
+      ).length,
     }),
     [menuItems],
   );
@@ -120,8 +130,17 @@ export default function AdminMenuPage() {
     const query = search.trim().toLowerCase();
 
     return menuItems.filter((item) => {
-      const matchesFilter =
+      const matchesStatus =
         filter === "all" || item.status === filter;
+
+      const matchesAvailability =
+        availabilityFilter === "all" ||
+        (availabilityFilter === "active" &&
+          item.status === "approved" &&
+          item.isAvailable === true) ||
+        (availabilityFilter === "inactive" &&
+          item.status === "approved" &&
+          item.isAvailable !== true);
 
       const matchesSearch =
         !query ||
@@ -129,9 +148,9 @@ export default function AdminMenuPage() {
         item.category.toLowerCase().includes(query) ||
         (item.vendorEmail || "").toLowerCase().includes(query);
 
-      return matchesFilter && matchesSearch;
+      return matchesStatus && matchesAvailability && matchesSearch;
     });
-  }, [menuItems, filter, search]);
+  }, [menuItems, filter, availabilityFilter, search]);
 
   const handleReview = async (
     item: MenuItem,
@@ -184,6 +203,119 @@ export default function AdminMenuPage() {
           ? `${item.name} has been approved successfully.`
           : `${item.name} has been rejected.`,
       );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleAvailability = async (item: MenuItem) => {
+    if (processingId || item.status !== "approved") return;
+
+    const nextAvailability = item.isAvailable !== true;
+
+    try {
+      setProcessingId(item._id);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/api/admin/menu/${item._id}/availability`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ isAvailable: nextAvailability }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        if (data.code === "FREE_PLAN_LIMIT_REACHED") {
+          throw new Error(
+            data.message ||
+              "This vendor has reached the Free plan limit of 3 active menu items.",
+          );
+        }
+
+        throw new Error(
+          data.message || "Unable to update item availability.",
+        );
+      }
+
+      setMenuItems((previous) =>
+        previous.map((menuItem) =>
+          menuItem._id === item._id
+            ? { ...menuItem, ...data.menuItem }
+            : menuItem,
+        ),
+      );
+
+      setSuccess(
+        data.message ||
+          `${item.name} has been ${
+            nextAvailability ? "activated" : "deactivated"
+          } successfully.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDelete = async (item: MenuItem) => {
+    if (processingId) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${item.name}"?\n\nThis action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setProcessingId(item._id);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/api/admin/menu/${item._id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        if (response.status === 409 || data.code === "ACTIVE_ORDERS_EXIST") {
+          throw new Error(
+            data.message ||
+              "This item has pending or accepted orders. Deactivate it instead of deleting it.",
+          );
+        }
+
+        throw new Error(data.message || "Unable to delete this menu item.");
+      }
+
+      setMenuItems((previous) =>
+        previous.filter((menuItem) => menuItem._id !== item._id),
+      );
+
+      setSuccess(data.message || `${item.name} has been deleted successfully.`);
     } catch (err) {
       setError(
         err instanceof Error
@@ -261,7 +393,7 @@ export default function AdminMenuPage() {
 
           <button
             onClick={loadMenuItems}
-            disabled={loading}
+            disabled={loading || Boolean(processingId)}
             className="inline-flex items-center gap-2 rounded-xl border border-[#DED8C9] bg-white px-4 py-3 text-xs font-bold text-[#42634D] transition hover:bg-[#F2EBDD] disabled:opacity-50"
           >
             <RefreshCw size={16} />
@@ -322,6 +454,35 @@ export default function AdminMenuPage() {
           })}
         </section>
 
+        {/* Availability Summary */}
+        <section className="mb-8 grid grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-[#D5E2D2] bg-[#FBF8F1] p-5">
+            <div className="flex items-center gap-2 text-[#42634D]">
+              <Power size={18} />
+              <p className="text-xs font-bold">Active Menu Items</p>
+            </div>
+            <p className="mt-2 font-serif text-3xl font-bold text-[#172B25]">
+              {counts.active}
+            </p>
+            <p className="mt-1 text-xs text-[#858173]">
+              Approved and available to customers
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[#E5DFD2] bg-[#FBF8F1] p-5">
+            <div className="flex items-center gap-2 text-[#A77938]">
+              <Power size={18} />
+              <p className="text-xs font-bold">Inactive Menu Items</p>
+            </div>
+            <p className="mt-2 font-serif text-3xl font-bold text-[#172B25]">
+              {counts.inactive}
+            </p>
+            <p className="mt-1 text-xs text-[#858173]">
+              Approved but hidden from customers
+            </p>
+          </div>
+        </section>
+
         {/* Alerts */}
         {error && (
           <div className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-[#E6C5BD] bg-[#F9EAE6] p-4 text-sm text-[#A65A4F]">
@@ -349,7 +510,7 @@ export default function AdminMenuPage() {
 
         {/* Filters and Search */}
         <section className="mb-6 rounded-2xl border border-[#E5DFD2] bg-[#FBF8F1] p-4 sm:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               {filters.map((item) => (
                 <button
@@ -369,18 +530,51 @@ export default function AdminMenuPage() {
               ))}
             </div>
 
-            <div className="relative w-full xl:max-w-[300px]">
-              <Search
-                size={17}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A09B8D]"
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name, category or vendor..."
-                className="w-full rounded-xl border border-[#DED8C9] bg-white py-3 pl-11 pr-4 text-xs text-[#24352C] outline-none transition placeholder:text-[#A09B8D] focus:border-[#71866B]"
-              />
+            <div className="flex flex-col gap-3 border-t border-[#E5DFD2] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-xs font-semibold text-[#858173]">
+                  Availability:
+                </span>
+
+                {[
+                  { label: "All", value: "all" },
+                  { label: `Active (${counts.active})`, value: "active" },
+                  {
+                    label: `Inactive (${counts.inactive})`,
+                    value: "inactive",
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() =>
+                      setAvailabilityFilter(
+                        item.value as AvailabilityFilter,
+                      )
+                    }
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                      availabilityFilter === item.value
+                        ? "bg-[#E8EEDC] text-[#29483A]"
+                        : "border border-[#DED8C9] text-[#706F63] hover:bg-[#F2EBDD]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:max-w-[300px]">
+                <Search
+                  size={17}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A09B8D]"
+                />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search name, category or vendor..."
+                  className="w-full rounded-xl border border-[#DED8C9] bg-white py-3 pl-11 pr-4 text-xs text-[#24352C] outline-none transition placeholder:text-[#A09B8D] focus:border-[#71866B]"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -415,6 +609,7 @@ export default function AdminMenuPage() {
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
               {filteredItems.map((item) => {
                 const isProcessing = processingId === item._id;
+                const isActive = item.isAvailable === true;
 
                 return (
                   <article
@@ -487,7 +682,34 @@ export default function AdminMenuPage() {
                         </p>
                       </div>
 
-                      {item.status === "pending" ? (
+                      {/* Availability Status */}
+                      {item.status === "approved" && (
+                        <div className="mt-4 flex items-center justify-between rounded-xl border border-[#E5DFD2] px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                isActive ? "bg-[#42634D]" : "bg-[#A77938]"
+                              }`}
+                            />
+                            <span className="text-xs font-semibold text-[#706F63]">
+                              {isActive ? "Active on menu" : "Inactive"}
+                            </span>
+                          </div>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                              isActive
+                                ? "bg-[#E3EEE5] text-[#42634D]"
+                                : "bg-[#F5EBD9] text-[#A77938]"
+                            }`}
+                          >
+                            {isActive ? "ACTIVE" : "INACTIVE"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Approval Actions */}
+                      {item.status === "pending" && (
                         <div className="mt-5 grid grid-cols-2 gap-3">
                           <button
                             onClick={() => handleReview(item, "approved")}
@@ -510,29 +732,71 @@ export default function AdminMenuPage() {
                             disabled={Boolean(processingId)}
                             className="flex items-center justify-center gap-2 rounded-xl border border-[#E6C5BD] bg-[#F9EAE6] px-3 py-3 text-xs font-bold text-[#A65A4F] transition hover:bg-[#F4E3DF] disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <X size={16} />
+                            {isProcessing ? (
+                              <LoaderCircle
+                                size={15}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <X size={16} />
+                            )}
                             Reject
                           </button>
                         </div>
-                      ) : (
-                        <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#E5DFD2] px-4 py-3 text-xs font-semibold text-[#858173]">
-                          {item.status === "approved" ? (
-                            <CheckCircle2
-                              size={17}
-                              className="text-[#42634D]"
-                            />
-                          ) : (
-                            <XCircle
-                              size={17}
-                              className="text-[#B65D4E]"
-                            />
-                          )}
+                      )}
 
-                          {item.status === "approved"
-                            ? "This item has been approved."
-                            : "This item has been rejected."}
+                      {item.status === "rejected" && (
+                        <div className="mt-5 flex items-center gap-2 rounded-xl border border-[#E5DFD2] px-4 py-3 text-xs font-semibold text-[#858173]">
+                          <XCircle
+                            size={17}
+                            className="text-[#B65D4E]"
+                          />
+                          This item has been rejected.
                         </div>
                       )}
+
+                      {/* Management Actions */}
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {item.status === "approved" && (
+                          <button
+                            onClick={() => handleAvailability(item)}
+                            disabled={Boolean(processingId)}
+                            className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                              isActive
+                                ? "border border-[#E6C5BD] bg-[#F9EAE6] text-[#A65A4F] hover:bg-[#F4E3DF]"
+                                : "bg-[#29483A] text-white hover:bg-[#42634D]"
+                            }`}
+                          >
+                            {isProcessing ? (
+                              <LoaderCircle
+                                size={15}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <Power size={15} />
+                            )}
+                            {isActive ? "Deactivate Item" : "Activate Item"}
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleDelete(item)}
+                          disabled={Boolean(processingId)}
+                          className={`flex items-center justify-center gap-2 rounded-xl border border-[#E6C5BD] bg-[#F9EAE6] px-3 py-3 text-xs font-bold text-[#A65A4F] transition hover:bg-[#F4E3DF] disabled:cursor-not-allowed disabled:opacity-50 ${
+                            item.status !== "approved" ? "sm:col-span-2" : ""
+                          }`}
+                        >
+                          {isProcessing ? (
+                            <LoaderCircle
+                              size={15}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <Trash2 size={15} />
+                          )}
+                          Delete Item
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );

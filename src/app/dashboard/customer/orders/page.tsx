@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  Clock3,
+  CalendarDays,
   PackageCheck,
   Pizza,
   ShoppingBag,
@@ -30,7 +30,23 @@ type CustomerOrder = {
   status: OrderStatus;
   restaurantName: string;
   createdAt: string;
+  deliveryDate?: string;
 };
+
+// Format YYYY-MM-DD without timezone shifting.
+function formatDeliveryDate(date?: string) {
+  if (!date) return "Not specified";
+
+  const [year, month, day] = date.split("-").map(Number);
+
+  if (!year || !month || !day) return "Not specified";
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 const statusStyles: Record<OrderStatus, string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -84,9 +100,7 @@ export default function CustomerOrdersPage() {
 
       setOrders(data.orders || []);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -100,7 +114,7 @@ export default function CustomerOrdersPage() {
 
   const handleCancelOrder = async (orderId: string) => {
     const confirmed = window.confirm(
-      "Are you sure you want to cancel this order?"
+      "Are you sure you want to cancel this order?",
     );
 
     if (!confirmed) return;
@@ -127,9 +141,7 @@ export default function CustomerOrdersPage() {
       setSuccess("Your order has been cancelled successfully.");
       await fetchOrders();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to cancel order."
-      );
+      setError(err instanceof Error ? err.message : "Failed to cancel order.");
     } finally {
       setCancellingId(null);
     }
@@ -236,8 +248,8 @@ export default function CustomerOrdersPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#858174]">
-              You haven't placed any orders yet. Explore our menu and
-              discover your favorite handcrafted pizza.
+              You haven't placed any orders yet. Explore our menu and discover
+              your favorite handcrafted pizza.
             </p>
 
             <Link
@@ -289,13 +301,16 @@ export default function CustomerOrdersPage() {
                       </div>
 
                       <span
-                        className={`h-fit w-fit rounded-full px-3 py-1.5 text-xs font-bold capitalize ${statusStyles[order.status] || statusStyles.pending}`}
+                        className={`h-fit w-fit rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+                          statusStyles[order.status] || statusStyles.pending
+                        }`}
                       >
                         {order.status}
                       </span>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {/* Order Information */}
+                    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                       <div>
                         <p className="text-xs text-[#858174]">Quantity</p>
                         <p className="mt-1 text-sm font-bold text-[#29483A]">
@@ -319,8 +334,21 @@ export default function CustomerOrdersPage() {
                               day: "numeric",
                               month: "short",
                               year: "numeric",
-                            }
+                            },
                           )}
+                        </p>
+                      </div>
+
+                      {/* Delivery Date */}
+                      <div>
+                        <p className="text-xs text-[#858174]">Delivery Date</p>
+
+                        <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-[#29483A]">
+                          <CalendarDays
+                            size={15}
+                            className="shrink-0 text-[#C69B62]"
+                          />
+                          {formatDeliveryDate(order.deliveryDate)}
                         </p>
                       </div>
                     </div>
@@ -353,8 +381,7 @@ export default function CustomerOrdersPage() {
             href="/menu"
             className="inline-flex items-center gap-2 text-sm font-semibold text-[#42634D] transition hover:text-[#172B25]"
           >
-            Want something delicious?
-            Explore more pizzas
+            Want something delicious? Explore more pizzas
             <ArrowRight size={16} />
           </Link>
         </div>
