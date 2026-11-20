@@ -1,3 +1,4 @@
+
 import type { UserRole } from "@/lib/auth";
 
 export const MIN_PASSWORD_LENGTH = 6;
@@ -27,14 +28,6 @@ export const getPasswordError = (password: string): string | null => {
 
   if (password.length > MAX_PASSWORD_LENGTH) {
     return `Password cannot exceed ${MAX_PASSWORD_LENGTH} characters.`;
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return "Password must contain at least one uppercase letter.";
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return "Password must contain at least one lowercase letter.";
   }
 
   return null;
