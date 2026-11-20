@@ -1,18 +1,28 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Store, User, Mail, Lock, MapPin, Phone } from "lucide-react";
+import {
+  getPasswordError,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+} from "@/lib/auth-helpers";
 
-export default function VendorRegisterPage() {
+const inputClass =
+  "w-full rounded-lg border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm text-[#24352C] outline-none transition placeholder:text-[#99998F] focus:border-[#42634D] focus:ring-2 focus:ring-[#42634D]/15";
+
+function VendorRegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [formData, setFormData] = useState({
-    ownerName: "",
+    ownerName: searchParams.get("name") || "",
     restaurantName: "",
-    email: "",
+    email: searchParams.get("email") || "",
+    image: searchParams.get("image") || "",
     password: "",
     confirmPassword: "",
     restaurantAddress: "",
@@ -23,9 +33,6 @@ export default function VendorRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
-  const inputClass =
-    "w-full rounded-lg border border-[#DED8C9] bg-[#FBF8F1] px-4 py-3 text-sm text-[#24352C] outline-none transition placeholder:text-[#99998F] focus:border-[#42634D] focus:ring-2 focus:ring-[#42634D]/15";
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -47,9 +54,19 @@ export default function VendorRegisterPage() {
       return;
     }
 
-    if (formData.password.length < 8) {
-      setErrorMessage("Password must contain at least 8 characters.");
+    const passwordError = getPasswordError(formData.password);
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return;
+    }
+
+    if (formData.image.trim()) {
+      try {
+        new URL(formData.image.trim());
+      } catch {
+        setErrorMessage("Please provide a valid profile image URL.");
+        return;
+      }
     }
 
     if (!agreeTerms) {
@@ -64,16 +81,19 @@ export default function VendorRegisterPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/vendors/register`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
+          // Role and block status are assigned by the server, never by the client.
           body: JSON.stringify({
-            ownerName: formData.ownerName,
-            restaurantName: formData.restaurantName,
-            email: formData.email,
+            ownerName: formData.ownerName.trim(),
+            restaurantName: formData.restaurantName.trim(),
+            email: formData.email.trim(),
+            image: formData.image.trim() || undefined,
             password: formData.password,
-            restaurantAddress: formData.restaurantAddress,
-            contactNumber: formData.contactNumber,
+            restaurantAddress: formData.restaurantAddress.trim(),
+            contactNumber: formData.contactNumber.trim(),
           }),
         }
       );
@@ -89,7 +109,7 @@ export default function VendorRegisterPage() {
       );
 
       setTimeout(() => {
-        router.push("/login");
+        router.replace("/login?registered=1");
       }, 2000);
     } catch (error) {
       setErrorMessage(
@@ -184,6 +204,25 @@ export default function VendorRegisterPage() {
               </div>
             </div>
 
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-[#24352C]">
+                Profile Image URL <span className="text-[#858C7F]">(optional)</span>
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-3.5 text-[#71866B]" size={18} />
+                <input
+                  type="url"
+                  name="image"
+                  value={formData.image}
+                  onChange={handleChange}
+                  placeholder="https://example.com/photo.jpg"
+                  maxLength={2000}
+                  autoComplete="off"
+                  className={`${inputClass} pl-10`}
+                />
+              </div>
+            </div>
+
             <div>
               <label className="mb-2 block text-sm font-medium text-[#24352C]">
                 Password
@@ -197,12 +236,15 @@ export default function VendorRegisterPage() {
                   onChange={handleChange}
                   placeholder="Create password"
                   required
-                  minLength={8}
-                  maxLength={128}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   autoComplete="new-password"
                   className={`${inputClass} pl-10`}
                 />
               </div>
+              <p className="mt-1 text-xs text-[#858C7F]">
+                At least {MIN_PASSWORD_LENGTH} characters with uppercase and lowercase letters.
+              </p>
             </div>
 
             <div>
@@ -218,8 +260,8 @@ export default function VendorRegisterPage() {
                   onChange={handleChange}
                   placeholder="Confirm password"
                   required
-                  minLength={8}
-                  maxLength={128}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={MAX_PASSWORD_LENGTH}
                   autoComplete="new-password"
                   className={`${inputClass} pl-10`}
                 />
@@ -313,5 +355,19 @@ export default function VendorRegisterPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function VendorRegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#E8E5D9]">
+          <p className="text-sm font-medium text-[#706F63]">Loading registration...</p>
+        </main>
+      }
+    >
+      <VendorRegisterForm />
+    </Suspense>
   );
 }

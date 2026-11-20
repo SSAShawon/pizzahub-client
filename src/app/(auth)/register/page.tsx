@@ -1,25 +1,37 @@
 
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { getPasswordError, MIN_PASSWORD_LENGTH } from "@/lib/auth-helpers";
 
-export default function CustomerRegisterPage() {
+type AccountType = "customer" | "vendor";
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback;
+
+const inputClass =
+  "w-full rounded-lg border border-[#C6CDBF] bg-[#EEF1E9] px-4 py-3 text-sm text-[#24352C] placeholder:text-[#858C7F] outline-none transition focus:border-[#42634D] focus:bg-white focus:ring-2 focus:ring-[#42634D]/15";
+
+function CustomerRegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(() => searchParams.get("name") || "");
+  const [email, setEmail] = useState(() => searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [image, setImage] = useState(() => searchParams.get("image") || "");
+  const [accountType, setAccountType] = useState<AccountType>(() =>
+    searchParams.get("type") === "vendor" ? "vendor" : "customer"
+  );
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-
-  const inputClass =
-    "w-full rounded-lg border border-[#C6CDBF] bg-[#EEF1E9] px-4 py-3 text-sm text-[#24352C] placeholder:text-[#858C7F] outline-none transition focus:border-[#42634D] focus:bg-white focus:ring-2 focus:ring-[#42634D]/15";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,9 +43,19 @@ export default function CustomerRegisterPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setErrorMessage("Password must contain at least 8 characters.");
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return;
+    }
+
+    if (image.trim()) {
+      try {
+        new URL(image.trim());
+      } catch {
+        setErrorMessage("Please provide a valid profile image URL.");
+        return;
+      }
     }
 
     if (!agreeTerms) {
@@ -41,13 +63,25 @@ export default function CustomerRegisterPage() {
       return;
     }
 
+    if (accountType === "vendor") {
+      const params = new URLSearchParams({
+        name: name.trim(),
+        email: email.trim(),
+      });
+      if (image.trim()) params.set("image", image.trim());
+      router.push(`/vendor/register?${params.toString()}`);
+      return;
+    }
+
     try {
       setLoading(true);
 
+      // Role and block status are never sent from the client. New accounts are customers.
       const result = await authClient.signUp.email({
         name: name.trim(),
         email: email.trim(),
         password,
+        image: image.trim() || undefined,
       });
 
       if (result.error) {
@@ -57,19 +91,46 @@ export default function CustomerRegisterPage() {
         return;
       }
 
-      setSuccessMessage(
-        "Account created successfully! Redirecting to login..."
-      );
-
-      setTimeout(() => router.push("/login"), 1500);
+      setSuccessMessage("Account created successfully! Redirecting to sign in...");
+      setTimeout(() => router.replace("/login?registered=1"), 1500);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again."
+        getErrorMessage(error, "Something went wrong. Please try again.")
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      setGoogleLoading(true);
+
+      const origin = window.location.origin;
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: `${origin}/auth/callback`,
+        newUserCallbackURL: `${origin}/auth/callback`,
+        errorCallbackURL: `${origin}/register`,
+      });
+
+      if (result.error) {
+        setErrorMessage(
+          result.error.message || "Unable to continue with Google."
+        );
+        return;
+      }
+
+      setSuccessMessage("Redirecting to Google...");
+    } catch (error) {
+      setErrorMessage(
+        getErrorMessage(error, "Unable to continue with Google.")
+      );
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -98,6 +159,41 @@ export default function CustomerRegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium text-[#24352C]">
+              Account Type
+            </legend>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#C6CDBF] bg-white px-3 py-2 text-sm text-[#24352C]">
+                <input
+                  type="radio"
+                  name="accountType"
+                  value="customer"
+                  checked={accountType === "customer"}
+                  onChange={() => setAccountType("customer")}
+                  className="accent-[#42634D]"
+                />
+                Customer
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#C6CDBF] bg-white px-3 py-2 text-sm text-[#24352C]">
+                <input
+                  type="radio"
+                  name="accountType"
+                  value="vendor"
+                  checked={accountType === "vendor"}
+                  onChange={() => setAccountType("vendor")}
+                  className="accent-[#42634D]"
+                />
+                Vendor
+              </label>
+            </div>
+            {accountType === "vendor" && (
+              <p className="mt-2 text-xs text-[#706F63]">
+                You’ll add your restaurant details on the next step.
+              </p>
+            )}
+          </fieldset>
+
           <div>
             <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#24352C]">
               Full Name
@@ -131,6 +227,21 @@ export default function CustomerRegisterPage() {
           </div>
 
           <div>
+            <label htmlFor="image" className="mb-2 block text-sm font-medium text-[#24352C]">
+              Profile Image URL <span className="text-[#858C7F]">(optional)</span>
+            </label>
+            <input
+              id="image"
+              type="url"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://example.com/photo.jpg"
+              autoComplete="off"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
             <label htmlFor="password" className="mb-2 block text-sm font-medium text-[#24352C]">
               Password
             </label>
@@ -141,10 +252,13 @@ export default function CustomerRegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Create a password"
               required
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-[#858C7F]">
+              At least {MIN_PASSWORD_LENGTH} characters with an uppercase and a lowercase letter.
+            </p>
           </div>
 
           <div>
@@ -158,7 +272,7 @@ export default function CustomerRegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm your password"
               required
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               className={inputClass}
             />
@@ -190,12 +304,33 @@ export default function CustomerRegisterPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="w-full rounded-lg bg-[#29483A] px-4 py-3 font-semibold text-white transition hover:bg-[#42634D] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Creating Account..." : "Create Account"}
+            {loading
+              ? "Creating Account..."
+              : accountType === "vendor"
+                ? "Continue to Restaurant Details"
+                : "Create Account"}
           </button>
         </form>
+
+        <div className="mt-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[#DED8C9]" />
+          <span className="text-xs uppercase tracking-wide text-[#858C7F]">
+            or
+          </span>
+          <span className="h-px flex-1 bg-[#DED8C9]" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignUp}
+          disabled={loading || googleLoading}
+          className="mt-5 w-full rounded-lg border border-[#C6CDBF] bg-white px-4 py-3 font-semibold text-[#24352C] transition hover:bg-[#EEF1E9] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {googleLoading ? "Connecting to Google..." : "Continue with Google"}
+        </button>
 
         <p className="mt-6 text-center text-sm text-[#706F63]">
           Already have an account?{" "}
@@ -203,19 +338,21 @@ export default function CustomerRegisterPage() {
             Sign in
           </Link>
         </p>
-
-        <div className="mt-6 border-t border-[#DED8C9] pt-5 text-center">
-          <p className="text-sm text-[#706F63]">
-            Are you a restaurant owner?
-          </p>
-          <Link
-            href="/vendor/register"
-            className="mt-2 inline-block text-sm font-semibold text-[#C69B62] hover:underline"
-          >
-            Register as a Vendor
-          </Link>
-        </div>
       </div>
     </main>
+  );
+}
+
+export default function CustomerRegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#E8E5D9]">
+          <p className="text-sm font-medium text-[#706F63]">Loading registration...</p>
+        </main>
+      }
+    >
+      <CustomerRegisterForm />
+    </Suspense>
   );
 }
