@@ -1,0 +1,82 @@
+.pizzahub-toaster[data-sonner-toaster] {
+  font-family: "DM Sans", sans-serif;
+}
+
+.pizzahub-toaster [data-sonner-toast] {
+  background: #fbf8f1;
+  border: 1px solid #ded8c9;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(23, 43, 37, 0.16);
+  color: #24352c;
+  font-family: "DM Sans", sans-serif;
+  padding: 14px 16px;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="success"] {
+  border-left: 4px solid #42634d;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="error"] {
+  border-left: 4px solid #8b2e2e;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="warning"] {
+  border-left: 4px solid #c69b62;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="info"],
+.pizzahub-toaster [data-sonner-toast][data-type="default"],
+.pizzahub-toaster [data-sonner-toast][data-type="loading"] {
+  border-left: 4px solid #29483a;
+}
+
+.pizzahub-toaster [data-title] {
+  color: #172b25;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pizzahub-toaster [data-description] {
+  color: #706f63;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.pizzahub-toaster [data-icon] {
+  color: #29483a;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="success"] [data-icon] {
+  color: #42634d;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="error"] [data-icon] {
+  color: #8b2e2e;
+}
+
+.pizzahub-toaster [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: #a36c2c;
+}
+
+.pizzahub-toaster [data-close-button] {
+  background: #f2ebdd;
+  border: 1px solid #ded8c9;
+  border-radius: 999px;
+  color: #172b25;
+}
+
+.pizzahub-toaster [data-close-button]:focus-visible {
+  outline: 2px solid #c69b62;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .pizzahub-toaster[data-sonner-toaster] {
+    width: calc(100vw - 2rem);
+  }
+
+  .pizzahub-toaster [data-sonner-toast] {
+    width: 100%;
+  }
+}

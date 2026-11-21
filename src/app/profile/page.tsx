@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   LoaderCircle,
 } from "lucide-react";
+import { messageFromError, notify } from "@/lib/toast";
 
 interface CustomerProfile {
   id: string;
@@ -138,14 +139,19 @@ export default function CustomerProfilePage() {
       setPhoneNumber(data.user.phoneNumber || "");
       setDeliveryAddress(data.user.deliveryAddress || "");
 
+      const successMessage = "Your profile has been updated successfully.";
+
       setIsEditing(false);
-      setSuccess("Your profile has been updated successfully.");
+      setSuccess(successMessage);
+      notify.success(successMessage, "customer-profile-update");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong while updating your profile."
+      const errorMessage = messageFromError(
+        err,
+        "Something went wrong while updating your profile.",
       );
+
+      setError(errorMessage);
+      notify.error(errorMessage, "customer-profile-update-error");
     } finally {
       setIsSaving(false);
     }

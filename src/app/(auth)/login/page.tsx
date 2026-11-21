@@ -9,6 +9,7 @@ import {
   dashboardPathForRole,
   normalizeRole,
 } from "@/lib/auth-helpers";
+import { notify } from "@/lib/toast";
 
 const getErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
@@ -97,6 +98,7 @@ function CustomerLoginForm() {
       setSuccessMessage(
         "Sign in successful! Redirecting to your dashboard..."
       );
+      notify.success("Sign in successful!", "sign-in");
 
       router.replace(`${dashboardPathForRole(role)}?signedIn=1`);
     } catch (error) {

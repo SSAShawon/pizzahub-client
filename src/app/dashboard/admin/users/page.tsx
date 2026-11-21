@@ -20,6 +20,7 @@ import {
   Check,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 type UserRole = "customer" | "vendor";
 
@@ -185,17 +186,20 @@ export default function AdminUsersPage() {
         ),
       );
 
-      setSuccess(
-        nextBlockedStatus
-          ? `${user.name}'s account has been blocked.`
-          : `${user.name}'s account has been unblocked.`,
-      );
+      const successMessage = nextBlockedStatus
+        ? `${user.name}'s account has been blocked.`
+        : `${user.name}'s account has been unblocked.`;
+
+      setSuccess(successMessage);
+      notify.success(successMessage, `user-status-${user.email}`);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.",
+      const errorMessage = messageFromError(
+        err,
+        "Something went wrong. Please try again.",
       );
+
+      setError(errorMessage);
+      notify.error(errorMessage, `user-status-error-${user.email}`);
     } finally {
       setProcessingId(null);
     }

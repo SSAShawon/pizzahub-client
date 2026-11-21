@@ -16,6 +16,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
+import { messageFromError, notify } from "@/lib/toast";
 
 type MenuStatus = "approved" | "pending" | "rejected";
 
@@ -157,7 +158,10 @@ export default function VendorMenuPage() {
       !formData.price ||
       Number(formData.price) <= 0
     ) {
-      alert("Please complete all required fields.");
+      notify.warning(
+        "Please complete all required fields.",
+        "vendor-menu-required-fields",
+      );
       return;
     }
 
@@ -197,13 +201,17 @@ export default function VendorMenuPage() {
 
       await loadMenuItems();
 
-      alert(
+      notify.success(
         isEditing
           ? "Menu item updated successfully!"
-          : "Menu item submitted for approval!"
+          : "Menu item submitted for approval!",
+        "vendor-menu-save",
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Something went wrong.");
+      notify.error(
+        messageFromError(err, "Something went wrong."),
+        "vendor-menu-save-error",
+      );
     } finally {
       setSaving(false);
     }
@@ -229,9 +237,15 @@ export default function VendorMenuPage() {
       setDeleteItemId(null);
       await loadMenuItems();
 
-      alert("Menu item deleted successfully!");
+      notify.success(
+        "Menu item deleted successfully!",
+        "vendor-menu-delete",
+      );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Something went wrong.");
+      notify.error(
+        messageFromError(err, "Something went wrong."),
+        "vendor-menu-delete-error",
+      );
     } finally {
       setDeleting(false);
     }

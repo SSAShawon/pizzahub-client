@@ -25,6 +25,7 @@ import {
 import Navbar from "@/components/shared/Navbar";
 import Footer from "@/components/shared/Footer";
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 export default function CustomerDashboard() {
   const router = useRouter();
@@ -65,6 +66,10 @@ export default function CustomerDashboard() {
         setOrders(data.orders || []);
       } catch (error) {
         console.error("Customer Orders Error:", error);
+        notify.error(
+          messageFromError(error, "Unable to load orders."),
+          "customer-dashboard-orders",
+        );
       } finally {
         setOrdersLoading(false);
       }
@@ -89,8 +94,16 @@ export default function CustomerDashboard() {
   }, [user, role, isPending, router]);
 
   const handleLogout = async () => {
-    await authClient.signOut();
-    router.push("/login");
+    try {
+      await authClient.signOut();
+      notify.success("You have been signed out.", "sign-out");
+      router.push("/login");
+    } catch (error) {
+      notify.error(
+        messageFromError(error, "Unable to sign out. Please try again."),
+        "sign-out-error",
+      );
+    }
   };
 
   if (isPending || !user || role !== "customer") {

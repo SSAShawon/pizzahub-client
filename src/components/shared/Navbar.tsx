@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     try {
       await authClient.signOut();
+      notify.success("You have been signed out.", "sign-out");
 
       setProfileOpen(false);
       setIsOpen(false);
@@ -63,6 +65,10 @@ export default function Navbar() {
       router.refresh();
     } catch (error) {
       console.error("Logout failed:", error);
+      notify.error(
+        messageFromError(error, "Unable to sign out. Please try again."),
+        "sign-out-error",
+      );
     }
   };
 

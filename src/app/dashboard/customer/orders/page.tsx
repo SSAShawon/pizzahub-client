@@ -18,6 +18,7 @@ import {
 import Navbar from "@/components/shared/Navbar";
 import Footer from "@/components/shared/Footer";
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 type OrderStatus = "pending" | "accepted" | "rejected" | "cancelled";
 
@@ -138,10 +139,16 @@ export default function CustomerOrdersPage() {
         throw new Error(data.message || "Unable to cancel this order.");
       }
 
-      setSuccess("Your order has been cancelled successfully.");
+      const successMessage = "Your order has been cancelled successfully.";
+
+      setSuccess(successMessage);
+      notify.success(successMessage, `order-cancel-${orderId}`);
       await fetchOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel order.");
+      const errorMessage = messageFromError(err, "Failed to cancel order.");
+
+      setError(errorMessage);
+      notify.error(errorMessage, `order-cancel-error-${orderId}`);
     } finally {
       setCancellingId(null);
     }

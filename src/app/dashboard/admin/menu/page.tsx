@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 type MenuItem = {
   _id: string;
@@ -198,17 +199,29 @@ export default function AdminMenuPage() {
         ),
       );
 
-      setSuccess(
+      const successMessage =
         status === "approved"
           ? `${item.name} has been approved successfully.`
-          : `${item.name} has been rejected.`,
-      );
+          : `${item.name} has been rejected.`;
+
+      setSuccess(successMessage);
+
+      if (data.code === "APPROVED_BUT_INACTIVE" && data.message) {
+        notify.warning(data.message, `menu-review-${item._id}`);
+      } else {
+        notify.success(
+          data.message || successMessage,
+          `menu-review-${item._id}`,
+        );
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.",
+      const errorMessage = messageFromError(
+        err,
+        "Something went wrong. Please try again.",
       );
+
+      setError(errorMessage);
+      notify.error(errorMessage, `menu-review-error-${item._id}`);
     } finally {
       setProcessingId(null);
     }
@@ -259,18 +272,22 @@ export default function AdminMenuPage() {
         ),
       );
 
-      setSuccess(
+      const successMessage =
         data.message ||
-          `${item.name} has been ${
-            nextAvailability ? "activated" : "deactivated"
-          } successfully.`,
-      );
+        `${item.name} has been ${
+          nextAvailability ? "activated" : "deactivated"
+        } successfully.`;
+
+      setSuccess(successMessage);
+      notify.success(successMessage, `menu-availability-${item._id}`);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.",
+      const errorMessage = messageFromError(
+        err,
+        "Something went wrong. Please try again.",
       );
+
+      setError(errorMessage);
+      notify.error(errorMessage, `menu-availability-error-${item._id}`);
     } finally {
       setProcessingId(null);
     }
@@ -315,13 +332,19 @@ export default function AdminMenuPage() {
         previous.filter((menuItem) => menuItem._id !== item._id),
       );
 
-      setSuccess(data.message || `${item.name} has been deleted successfully.`);
+      const successMessage =
+        data.message || `${item.name} has been deleted successfully.`;
+
+      setSuccess(successMessage);
+      notify.success(successMessage, `menu-delete-${item._id}`);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.",
+      const errorMessage = messageFromError(
+        err,
+        "Something went wrong. Please try again.",
       );
+
+      setError(errorMessage);
+      notify.error(errorMessage, `menu-delete-error-${item._id}`);
     } finally {
       setProcessingId(null);
     }

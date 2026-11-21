@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 type OrderStatus = "pending" | "accepted" | "rejected" | "cancelled";
 type FilterStatus = "all" | OrderStatus;
@@ -166,16 +167,21 @@ export default function VendorOrdersPage() {
         throw new Error(data.message || `Unable to ${action} order.`);
       }
 
-      setSuccess(
+      const successMessage =
         newStatus === "accepted"
           ? "Order accepted successfully."
-          : "Order rejected successfully.",
-      );
+          : "Order rejected successfully.";
+
+      setSuccess(successMessage);
+      notify.success(successMessage, `vendor-order-${orderId}`);
 
       setSelectedOrder(null);
       await fetchOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update order.");
+      const errorMessage = messageFromError(err, "Failed to update order.");
+
+      setError(errorMessage);
+      notify.error(errorMessage, `vendor-order-error-${orderId}`);
     } finally {
       setUpdatingId(null);
     }

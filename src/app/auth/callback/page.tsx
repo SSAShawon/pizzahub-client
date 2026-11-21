@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { dashboardPathForRole, normalizeRole } from "@/lib/auth-helpers";
+import { notify } from "@/lib/toast";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function AuthCallbackPage() {
 
         redirected.current = true;
         setMessage("Signed in successfully. Redirecting...");
+        notify.success("Signed in successfully!", "google-sign-in");
         router.replace(dashboardPathForRole(normalizeRole(user.role)));
       } catch (error) {
         console.error("Auth callback error:", error);

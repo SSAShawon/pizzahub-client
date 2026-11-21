@@ -23,6 +23,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { messageFromError, notify } from "@/lib/toast";
 
 type MenuItem = {
   _id: string;
@@ -177,8 +178,15 @@ export default function AdminDashboardPage() {
   ];
 
   const handleLogout = async () => {
-    await authClient.signOut();
-    window.location.href = "/login";
+    try {
+      await authClient.signOut();
+      window.location.href = "/login";
+    } catch (error) {
+      notify.error(
+        messageFromError(error, "Unable to sign out. Please try again."),
+        "sign-out-error",
+      );
+    }
   };
 
   if (isPending || loading) {

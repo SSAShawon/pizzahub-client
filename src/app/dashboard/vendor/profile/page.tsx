@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Store,
 } from "lucide-react";
+import { messageFromError, notify } from "@/lib/toast";
 
 type VendorProfile = {
   ownerName: string;
@@ -121,9 +122,15 @@ export default function VendorProfilePage() {
         contactNumber: data.profile.contactNumber || "",
       });
 
-      setSuccess("Restaurant profile updated successfully!");
+      const successMessage = "Restaurant profile updated successfully!";
+
+      setSuccess(successMessage);
+      notify.success(successMessage, "vendor-profile-update");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const errorMessage = messageFromError(err, "Something went wrong.");
+
+      setError(errorMessage);
+      notify.error(errorMessage, "vendor-profile-update-error");
     } finally {
       setSaving(false);
     }

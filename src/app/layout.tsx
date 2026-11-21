@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import RouteGuard from "@/components/auth/RouteGuard";
+import ToastProvider from "@/components/toast/ToastProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={<>{children}</>}>
           <RouteGuard>{children}</RouteGuard>
         </Suspense>
+        <ToastProvider />
       </body>
     </html>
   );
